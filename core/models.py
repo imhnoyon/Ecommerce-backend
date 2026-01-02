@@ -4,6 +4,8 @@ from .managers import UserManager
 from django.conf import settings
 from django.db.models import Sum, F
 
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     is_staff = models.BooleanField(default=False)
@@ -62,11 +64,7 @@ class Order(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
     created_at = models.DateTimeField(auto_now_add=True)
 
-    # def calculate_total(self):
-    #     total = self.items.aggregate(
-    #         total=Sum(F("price") * F("quantity"))
-    #     )["total"]
-    #     return total or 0
+   
 
     def update_total(self):
         total = self.items.aggregate(total=Sum(F("price") * F("quantity")))["total"] or 0
@@ -88,9 +86,6 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f"{self.product.name} X {self.quantity}"
-
-
-
 
 
 
