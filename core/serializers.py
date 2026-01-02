@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Product,Order,OrderItem,User
+from .models import Product,Order,OrderItem,User,Payment
 
 
 
@@ -80,3 +80,21 @@ class OrderSerializer(serializers.ModelSerializer):
 
         instance.update_total()
         return instance
+
+
+
+
+
+class CreatePaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = ["order", "provider"]
+        
+        
+        
+        
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = "__all__"
+        read_only_fields = "__all__"
