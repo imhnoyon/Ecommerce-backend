@@ -34,7 +34,8 @@ class Product(models.Model):
     stock = models.PositiveIntegerField()
     status = models.CharField( max_length=10, choices=STATUS_CHOICES,  default="active")
     created_at = models.DateTimeField(auto_now_add=True)
-
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,null=True, blank=True, on_delete=models.CASCADE)
+    
     def reduce_stock(self, quantity):
         if self.stock < quantity:
             raise ValueError("Insufficient stock")
@@ -61,15 +62,16 @@ class Order(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def calculate_total(self):
-        total = self.items.aggregate(
-            total=Sum(F("price") * F("quantity"))
-        )["total"]
-        return total or 0
+    # def calculate_total(self):
+    #     total = self.items.aggregate(
+    #         total=Sum(F("price") * F("quantity"))
+    #     )["total"]
+    #     return total or 0
 
     def update_total(self):
-        self.total_amount = self.calculate_total()
-        self.save(update_fields=["total_amount"])
+        total = self.items.aggregate(total=Sum(F("price") * F("quantity")))["total"] or 0
+        self.total_amount = total
+        self.save()
 
     def __str__(self):
         return f"Order #{self.id}"
