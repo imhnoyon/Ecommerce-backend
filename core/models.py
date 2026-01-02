@@ -85,7 +85,7 @@ class OrderItem(models.Model):
         return self.price * self.quantity
 
     def __str__(self):
-        return f"{self.product.name} × {self.quantity}"
+        return f"{self.product.name} X {self.quantity}"
 
 
 
