@@ -134,3 +134,18 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
+
+
+
+
+
+
+
+
+
+BKASH_BASE_URL = "https://sandbox.sandbox.bka.sh/v1.2.0-beta"
+
+BKASH_APP_KEY = "your_app_key"
+BKASH_APP_SECRET = "your_app_secret"
+BKASH_USERNAME = "your_username"
+BKASH_PASSWORD = "your_password"
