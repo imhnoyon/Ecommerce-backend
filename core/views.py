@@ -63,6 +63,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.conf import settings
+import requests
 from .payments_system import get_bkash_token
     
 class BkashPaymentInitView(APIView):
@@ -71,13 +72,13 @@ class BkashPaymentInitView(APIView):
     def post(self, request):
         order_id = request.data.get("order_id")
 
-        # 1️⃣ Order check
+        #  Order check
         try:
             order = Order.objects.get(id=order_id, user=request.user)
         except Order.DoesNotExist:
             return Response({"error": "Order not found"}, status=404)
 
-        # 2️⃣ Create Payment (DB)
+        #  Create Payment (DB)
         transaction_id = str(uuid.uuid4())
 
         payment = Payment.objects.create(
@@ -88,12 +89,12 @@ class BkashPaymentInitView(APIView):
             raw_response={}
         )
 
-        # 3️⃣ bKash token
+        #  bKash token
         token = get_bkash_token()
         if not token:
             return Response({"error": "bKash token failed"}, status=400)
 
-        # 4️⃣ REAL bKash CREATE PAYMENT API
+        #  REAL bKash CREATE PAYMENT API
         url = f"{settings.BKASH_BASE_URL}/tokenized/checkout/create"
 
         headers = {
@@ -115,11 +116,11 @@ class BkashPaymentInitView(APIView):
         response = requests.post(url, json=payload, headers=headers)
         data = response.json()
 
-        # 5️⃣ Save gateway response
+        #  Save gateway response
         payment.raw_response = data
         payment.save()
 
-        # 6️⃣ Return redirect URL
+        # Return redirect URL
         return Response({
             "paymentID": data.get("paymentID"),
             "bkashURL": data.get("bkashURL"),
@@ -147,3 +148,63 @@ class PaymentSuccessView(APIView):
         order.save()
 
         return Response({"message": "Payment successful"})
+
+
+
+
+
+
+
+
+
+class BkashPaymentExecuteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        paymentID = request.data.get("paymentID")
+
+        token = get_bkash_token()
+
+        url = f"{settings.BKASH_BASE_URL}/tokenized/checkout/execute"
+
+        headers = {
+            "Authorization": token,
+            "X-APP-Key": settings.BKASH_APP_KEY,
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "paymentID": paymentID
+        }
+
+        response = requests.post(url, json=payload, headers=headers)
+        data = response.json()
+
+        transaction_id = data.get("merchantInvoiceNumber")
+
+        payment = Payment.objects.get(transaction_id=transaction_id)
+
+        if data.get("statusCode") == "0000":
+            payment.status = "success"
+            payment.raw_response = data
+            payment.save()
+
+            order = payment.order
+            order.status = "paid"
+            order.save()
+
+            return Response({"message": "bKash payment successful"})
+
+        payment.status = "failed"
+        payment.raw_response = data
+        payment.save()
+
+        return Response({"message": "Payment failed"}, status=400)
+
+
+
+from rest_framework.decorators import api_view
+
+@api_view(["GET", "POST"])
+def bkash_callback(request):
+    return requests.Response({"message": "Callback received"})

@@ -20,3 +20,5 @@ def get_bkash_token():
     data = response.json()
 
     return data.get("id_token")
+
+
