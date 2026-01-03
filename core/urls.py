@@ -1,5 +1,5 @@
 from rest_framework.routers import DefaultRouter
-from .views import productViewset,OrderItemViewset,OrderViewset,RegisterUserView,PaymentViewSet, BkashPaymentInitView, BkashPaymentExecuteView,bkash_callback
+from .views import productViewset,OrderItemViewset,OrderViewset,RegisterUserView,PaymentViewSet, BkashPaymentInitView, BkashPaymentExecuteView,bkash_callback, StripePaymentInitView, StripePaymentConfirmView, stripe_webhook
 from django.urls import path, include
 
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -18,5 +18,8 @@ urlpatterns =[
      path("payment/bkash/init/", BkashPaymentInitView.as_view()),
     path("payment/bkash/execute/", BkashPaymentExecuteView.as_view()),
     path("payment/bkash/callback/", bkash_callback),
+    path("payment/stripe/init/", StripePaymentInitView.as_view()),
+    path("payment/stripe/confirm/", StripePaymentConfirmView.as_view()),
+    path("payment/stripe/webhook/", stripe_webhook),
     
 ]
