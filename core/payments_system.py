@@ -80,12 +80,14 @@ def create_stripe_payment_intent(amount, currency="bdt", metadata=None):
     return intent
 
 
-def confirm_stripe_payment_intent(payment_intent_id, payment_method=None):
+def confirm_stripe_payment_intent(payment_intent_id, payment_method=None, return_url=None):
     """Confirm a Stripe PaymentIntent."""
-    intent = stripe.PaymentIntent.confirm(
-        payment_intent_id,
-        payment_method=payment_method,
-    )
+    kwargs = {}
+    if payment_method:
+        kwargs['payment_method'] = payment_method
+    if return_url:
+        kwargs['return_url'] = return_url
+    intent = stripe.PaymentIntent.confirm(payment_intent_id, **kwargs)
     return intent
 
 

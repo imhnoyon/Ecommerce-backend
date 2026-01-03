@@ -323,18 +323,30 @@ class StripePaymentInitView(APIView):
             "transaction_id": transaction_id
         })
 
-
 class StripePaymentConfirmView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        print("StripePaymentConfirmView called")  # Debug
         payment_intent_id = request.data.get("payment_intent_id")
+        payment_method_id = request.data.get("payment_method_id")  # For backend confirmation
+        print(f"payment_intent_id: {payment_intent_id}, payment_method_id: {payment_method_id}")  # Debug
 
         if not payment_intent_id:
             return Response({"error": "payment_intent_id required"}, status=400)
 
         # Retrieve and confirm the PaymentIntent
-        intent = confirm_stripe_payment_intent(payment_intent_id)
+        if payment_method_id:
+            # Update the PaymentIntent with payment method
+            stripe.PaymentIntent.modify(
+                payment_intent_id,
+                payment_method=payment_method_id,
+            )
+        
+        intent = confirm_stripe_payment_intent(
+            payment_intent_id, 
+            return_url="http://127.0.0.1:8000/payment/success/"
+        )
 
         if not intent:
             return Response({"error": "Stripe confirm failed"}, status=400)
@@ -373,7 +385,7 @@ class StripePaymentConfirmView(APIView):
         payment.save()
 
         return Response({"message": "Payment failed"}, status=400)
-
+    
 
 import json
 from django.http import HttpResponse
