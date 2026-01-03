@@ -32,13 +32,29 @@ class productViewset(ModelViewSet):
 class OrderItemViewset(ModelViewSet):
     queryset=OrderItem.objects.all()
     serializer_class= OrderItemSerializer
+    permission_classes=[IsAdminOrReadOnly]
     
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return Order.objects.all()
+        return Order.objects.filter(user=user)
     
     
     
 class OrderViewset(ModelViewSet):
     queryset=Order.objects.all()
     serializer_class=OrderSerializer
+    permission_classes=[IsAdminOrReadOnly]
+    
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return Order.objects.all()
+        return Order.objects.filter(user=user)
+    
     
     
     
@@ -56,6 +72,24 @@ class PaymentViewSet(ModelViewSet):
         serializer.save( transaction_id=str(uuid.uuid4()), status="pending", raw_response={})
  
  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         
 #chatGpt theke niye try korar jonno        
         

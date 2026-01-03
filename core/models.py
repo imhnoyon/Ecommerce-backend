@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from .managers import UserManager
@@ -67,9 +68,12 @@ class Order(models.Model):
    
 
     def update_total(self):
-        total = self.items.aggregate(total=Sum(F("price") * F("quantity")))["total"] or 0
+        total = Decimal("0.00")
+        for item in self.items.all():
+            total += item.price * item.quantity
+
         self.total_amount = total
-        self.save()
+        self.save(update_fields=["total_amount"])
 
     def __str__(self):
         return f"Order #{self.id}"

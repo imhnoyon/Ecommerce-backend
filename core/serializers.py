@@ -56,7 +56,9 @@ class OrderSerializer(serializers.ModelSerializer):
 
         for item in items_data:
             OrderItem.objects.create( order=order, product=item["product"], quantity=item["quantity"], price=item["price"], )
+        print("BEFORE UPDATE:", order.total_amount)    
         order.update_total()
+        print("AFTER UPDATE:", order.total_amount)
         return order
 
     
@@ -71,13 +73,8 @@ class OrderSerializer(serializers.ModelSerializer):
         if items_data is not None:
             instance.items.all().delete()
             for item in items_data:
-                OrderItem.objects.create(
-                    order=instance,
-                    product=item["product"],
-                    quantity=item["quantity"],
-                    price=item["price"],
-                )
-
+                OrderItem.objects.create(order=instance, product=item["product"], quantity=item["quantity"],  price=item["price"])
+        
         instance.update_total()
         return instance
 
