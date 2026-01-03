@@ -36,7 +36,7 @@ class Product(models.Model):
     stock = models.PositiveIntegerField()
     status = models.CharField( max_length=10, choices=STATUS_CHOICES,  default="active")
     created_at = models.DateTimeField(auto_now_add=True)
-    user=models.ForeignKey(settings.AUTH_USER_MODEL,null=True, blank=True, on_delete=models.CASCADE)
+    
     
     def reduce_stock(self, quantity):
         if self.stock < quantity:
