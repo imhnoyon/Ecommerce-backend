@@ -11,7 +11,9 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
-
+import environ
+env = environ.Env()
+environ.Env.read_env()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -155,17 +157,11 @@ BKASH_PASSWORD = os.environ.get("BKASH_PASSWORD", "your_password")
 # callback URL that bKash will call (set to your public URL in production)
 BKASH_CALLBACK_URL = os.environ.get("BKASH_CALLBACK_URL", "http://127.0.0.1:8000/api/payment/bkash/callback/")
 
-# Stripe settings
-# STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "pk_test_your_publishable_key")
-# STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "sk_test_your_secret_key")
-# STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "whsec_your_webhook_secret")
 
-# STRIPE_PUBLISHABLE_KEY = 'pk_test_51SlWJ93gtWGimJpJkoRAtV9dJJ7vIczAtUD3fqguy9j15da19cbC9jSyalsRHFjla6HXk6gKJrQSX3fIzCqmhDa500u4tCJ7mK'
-# STRIPE_SECRET_KEY = 'sk_test_51SlWJ93gtWGimJpJ2Ww8AlELlDJKbQjOeTZ05gGw55g7W6iWEU7TvueNfCxBpZk1iPToCwl1uW1o7qM7YsR6GvJm00nMYkttx5'
-# STRIPE_WEBHOOK_SECRET = 'whsec_bbc2e4efd5228f30494342b4de6e73d4cc15e8d20c9ad67589e280d59e25b3f3'
 
 
 
 STRIPE_PUBLIC_KEY="pk_test_51SlWJ93gtWGimJpJkoRAtV9dJJ7vIczAtUD3fqguy9j15da19cbC9jSyalsRHFjla6HXk6gKJrQSX3fIzCqmhDa500u4tCJ7mK"
 STRIPE_SECRET_KEY="sk_test_51SlWJ93gtWGimJpJ2Ww8AlELlDJKbQjOeTZ05gGw55g7W6iWEU7TvueNfCxBpZk1iPToCwl1uW1o7qM7YsR6GvJm00nMYkttx5"
 STRIPE_SECRET_WEBHOOK="whsec_bbc2e4efd5228f30494342b4de6e73d4cc15e8d20c9ad67589e280d59e25b3f3"
+

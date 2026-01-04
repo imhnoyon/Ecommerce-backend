@@ -169,6 +169,11 @@ def handle_successful_payment(session):
             print(f"Order found: {order.id}, current status: {order.status}")
             logger.info(f"Order found: {order.id}, current status: {order.status}")
             if order.status == 'pending':
+                # Lock the products to prevent race conditions
+                product_ids = order.items.values_list('product_id', flat=True)
+                products = Product.objects.select_for_update().filter(id__in=product_ids)
+                product_dict = {p.id: p for p in products}
+
                 order.status = 'paid'
                 order.save()
                 print(f"Order {order.id} status updated to paid")
@@ -176,9 +181,11 @@ def handle_successful_payment(session):
 
                 # Reduce stock
                 for item in order.items.all():
-                    print(f"Reducing stock for product {item.product.name}: {item.quantity}")
-                    logger.info(f"Reducing stock for product {item.product.name}: {item.quantity}")
-                    item.product.reduce_stock(item.quantity)
+                    product = product_dict[item.product_id]
+                    print(f"Reducing stock for product {product.name}: current stock {product.stock}, reducing by {item.quantity}")
+                    logger.info(f"Reducing stock for product {product.name}: {item.quantity}")
+                    product.reduce_stock(item.quantity)
+                    print(f"New stock for product {product.name}: {product.stock}")
 
                 # Create Payment record
                 Payment.objects.create(
