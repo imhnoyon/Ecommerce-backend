@@ -1,5 +1,4 @@
 from .payments_system import create_stripe_checkout_session, create_bkash_payment, execute_bkash_payment, query_bkash_payment
-
 from django.shortcuts import redirect, render
 from requests import Response
 from rest_framework.viewsets import ModelViewSet
@@ -7,23 +6,18 @@ import stripe
 from .models import Product,OrderItem,Order,User,Payment
 from .serializers import ProductSerializer,OrderSerializer,OrderItemSerializer,RegisterSerializer,CreatePaymentSerializer,PaymentSerializer
 from .permissions import IsAdminOrReadOnly
-
 import logging
 logger = logging.getLogger(__name__)
-
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 import json
 from django.db import transaction
-
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 import uuid
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.conf import settings
-
 from rest_framework import status
 
 
@@ -169,7 +163,6 @@ def handle_successful_payment(session):
             print(f"Order found: {order.id}, current status: {order.status}")
             logger.info(f"Order found: {order.id}, current status: {order.status}")
             if order.status == 'pending':
-                # Lock the products to prevent race conditions
                 product_ids = order.items.values_list('product_id', flat=True)
                 products = Product.objects.select_for_update().filter(id__in=product_ids)
                 product_dict = {p.id: p for p in products}
@@ -182,7 +175,8 @@ def handle_successful_payment(session):
 
                 for item in order.items.all():
                     item.product.reduce_stock(item.quantity) 
-
+                    
+                order.update_total()
                 order.status = 'paid'
                 order.save()
                 print(f"Order {order.id} status updated to paid")
@@ -223,12 +217,13 @@ class BkashPaymentInitView(APIView):
 
     def post(self, request, order_id, *args, **kwargs):
         print(f"bKash init: user={request.user}, order_id={order_id}") 
-        payer_reference = request.data.get('payer_reference', '017XXXXXXXX')  # Example mobile number
+         
         try:
             if request.user.is_staff or request.user.is_superuser:
                 order = Order.objects.get(id=order_id)
             else:
                 order = Order.objects.get(id=order_id, user=request.user)
+                payer_reference = str(order.id) 
             print(f"Order found: {order.id}, status={order.status}")
         except Order.DoesNotExist:
             print(f"Order not found for user {request.user} and order_id {order_id}")
@@ -236,11 +231,10 @@ class BkashPaymentInitView(APIView):
 
         if order.status != 'pending':
             return Response({"error": "Order is not pending"}, status=400)
-        total=0
-        for item in order.items.all():
-            total +=int(item.price * item.quantity * 100)
             
-        payment_data = create_bkash_payment(total, order.id, payer_reference)
+         
+        subtotal = sum(item.subtotal() for item in order.items.all())   
+        payment_data = create_bkash_payment(subtotal, order.id, payer_reference)
         if payment_data:
             return Response(payment_data)
         else:
@@ -264,8 +258,7 @@ class BkashPaymentExecuteView(APIView):
 
 
 
-from django.http import HttpResponse
-from django.db import transaction
+
 
 @csrf_exempt
 def bkash_callback(request):
@@ -281,27 +274,26 @@ def bkash_callback(request):
             
             try:
                 with transaction.atomic():
-                    # select_for_update ব্যবহার করা হয়েছে যাতে একই সময়ে অন্য কেউ স্টক আপডেট না করতে পারে
                     order = Order.objects.select_for_update().get(id=order_id)
                     
                     if order.status == 'pending':
                         
-                        # ১. ভ্যালিডেশন: আগে চেক করুন সব আইটেমের স্টক পর্যাপ্ত আছে কিনা
+                        
                         for item in order.items.all():
                             if item.product.stock < item.quantity:
-                                # যদি স্টক কম থাকে, এখান থেকেই এরর মেসেজ দিন (পেমেন্ট রেকর্ড হবে না)
                                 return HttpResponse(
                                     f"<h1>Payment Failed!</h1><p>Insufficient stock for {item.product.name}. "
                                     f"Available: {item.product.stock}, Requested: {item.quantity}</p>", 
                                     status=400
                                 )
 
-                        # ২. যদি উপরের লুপে কোনো সমস্যা না থাকে, তবে স্টক কমান
+                        
                         for item in order.items.all():
                             product = item.product 
                             product.reduce_stock(item.quantity)
 
-                        # ৩. অর্ডার স্ট্যাটাস এবং পেমেন্ট রেকর্ড আপডেট
+                        
+                        order.update_total()
                         order.status = 'paid'
                         order.save()
 

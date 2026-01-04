@@ -17,7 +17,6 @@ import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
-# .env ফাইলটি লোড করা
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 
@@ -136,7 +135,7 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME":timedelta(minutes=60),
+    "ACCESS_TOKEN_LIFETIME":timedelta(minutes=180),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
@@ -152,7 +151,8 @@ BKASH_USERNAME = env('BKASH_USERNAME')
 BKASH_PASSWORD = env('BKASH_PASSWORD')
 BKASH_CALLBACK_URL = env('BKASH_CALLBACK_URL')
 
-STRIPE_PUBLIC_KEY="pk_test_51SlWJ93gtWGimJpJkoRAtV9dJJ7vIczAtUD3fqguy9j15da19cbC9jSyalsRHFjla6HXk6gKJrQSX3fIzCqmhDa500u4tCJ7mK"
+STRIPE_PUBLIC_KEY=env('STRIPE_PUBLIC_KEY')
 STRIPE_SECRET_KEY="sk_test_51SlWJ93gtWGimJpJ2Ww8AlELlDJKbQjOeTZ05gGw55g7W6iWEU7TvueNfCxBpZk1iPToCwl1uW1o7qM7YsR6GvJm00nMYkttx5"
 STRIPE_SECRET_WEBHOOK="whsec_bbc2e4efd5228f30494342b4de6e73d4cc15e8d20c9ad67589e280d59e25b3f3"
+
 

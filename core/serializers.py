@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Product,Order,OrderItem,User,Payment
-
+from django.db import transaction
 
 
 
@@ -39,44 +39,62 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 
 
+
+
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True)
-    total_amount = serializers.DecimalField( max_digits=10, decimal_places=2, read_only=True )
+    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = Order
         fields = ["id", "user", "status", "total_amount", "items", "created_at"]
         read_only_fields = ["user", "created_at"]
 
-    
     def create(self, validated_data):
         items_data = validated_data.pop("items")
         user = self.context["request"].user
-        order = Order.objects.create(user=user, **validated_data)
+        
+        with transaction.atomic():
+            order = Order.objects.create(user=user, **validated_data)
 
-        for item in items_data:
-            OrderItem.objects.create( order=order, product=item["product"], quantity=item["quantity"], price=item["price"], )
-        print("BEFORE UPDATE:", order.total_amount)    
-        order.update_total()
-        print("AFTER UPDATE:", order.total_amount)
-        return order
+            for item in items_data:
+                OrderItem.objects.create(
+                    order=order, 
+                    product=item["product"], 
+                    quantity=item["quantity"], 
+                    price=item["price"]
+                )
+            
+            order.refresh_from_db() 
+            print(f"BEFORE UPDATE: {order.total_amount}")
+            order.update_total()
+            print(f"AFTER UPDATE: {order.total_amount}")
+            
+            return order
 
-    
     def update(self, instance, validated_data):
         items_data = validated_data.pop("items", None)
 
-       
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
+        with transaction.atomic():
+            
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
 
-        if items_data is not None:
-            instance.items.all().delete()
-            for item in items_data:
-                OrderItem.objects.create(order=instance, product=item["product"], quantity=item["quantity"],  price=item["price"])
-        
-        instance.update_total()
-        return instance
+            if items_data is not None:
+                
+                instance.items.all().delete()
+                for item in items_data:
+                    OrderItem.objects.create(
+                        order=instance, 
+                        product=item["product"], 
+                        quantity=item["quantity"], 
+                        price=item["price"]
+                    )
+            instance.refresh_from_db()
+            instance.update_total()
+            
+            return instance
 
 
 
@@ -94,5 +112,4 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = "__all__"
-        # পেমেন্ট মডেলের ফিল্ডগুলোর নাম এখানে দিন
         read_only_fields = ["id", "order", "provider", "transaction_id", "status", "raw_response", "created_at"]
