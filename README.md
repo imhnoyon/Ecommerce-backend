@@ -42,7 +42,7 @@ The system utilizes four specialized tables designed for relational efficiency:
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
+https://github.com/imhnoyon/Ecommerce-backend.git
 cd your-repo-name
 ```
 
