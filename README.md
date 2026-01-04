@@ -1,4 +1,5 @@
 🛒 Modern E-commerce REST API Backend
+
 A robust, scalable, and secure E-commerce Backend built with Django REST Framework (DRF). This project implements advanced features like JWT authentication, real-time inventory management with race-condition prevention, and multi-gateway payment integrations (bKash & Stripe).
 
 🚀 Key Features
