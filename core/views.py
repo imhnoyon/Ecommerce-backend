@@ -1,13 +1,32 @@
-from django.shortcuts import render
+from .payments_system import create_stripe_checkout_session
+
+from django.shortcuts import redirect, render
+from requests import Response
 from rest_framework.viewsets import ModelViewSet
 import stripe
 from .models import Product,OrderItem,Order,User,Payment
 from .serializers import ProductSerializer,OrderSerializer,OrderItemSerializer,RegisterSerializer,CreatePaymentSerializer,PaymentSerializer
 from .permissions import IsAdminOrReadOnly
 
+import logging
+logger = logging.getLogger(__name__)
+
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse
+import json
+from django.db import transaction
+
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 import uuid
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.conf import settings
+
+from rest_framework import status
+
+
 
 class productPagination(PageNumberPagination):
     page_size = 3
@@ -61,7 +80,7 @@ class OrderViewset(ModelViewSet):
     
 class PaymentViewSet(ModelViewSet):
     queryset = Payment.objects.all()
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     
     def get_serializer_class(self):
         if self.action == "create":
@@ -77,361 +96,127 @@ class PaymentViewSet(ModelViewSet):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-#chatGpt theke niye try korar jonno        
-        
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from django.conf import settings
-import requests
-from .payments_system import get_bkash_token, create_bkash_payment, execute_bkash_payment, create_stripe_payment_intent, confirm_stripe_payment_intent, retrieve_stripe_payment_intent
-    
-class BkashPaymentInitView(APIView):
+class StripeCreateSessionView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        order_id = request.data.get("order_id")
-
-        #  Order check
+    def post(self, request, *args, **kwargs):
+        order_id = kwargs.get('id')  # Get order id from URL
         try:
             order = Order.objects.get(id=order_id, user=request.user)
         except Order.DoesNotExist:
             return Response({"error": "Order not found"}, status=404)
 
-        #  Create Payment (DB)
-        transaction_id = str(uuid.uuid4())
-
-        payment = Payment.objects.create(
-            order=order,
-            provider="bkash",
-            transaction_id=transaction_id,
-            status="pending",
-            raw_response={}
-        )
-
-        #  bKash token
-        token = get_bkash_token()
-        if not token:
-            return Response({"error": "bKash token failed"}, status=400)
-        payload = {
-            "mode": "0011",
-            "payerReference": request.user.email,
-            "callbackURL": getattr(settings, "BKASH_CALLBACK_URL", "http://127.0.0.1:8000/api/payment/bkash/callback/"),
-            "amount": str(order.total_amount),
-            "currency": "BDT",
-            "intent": "sale",
-            "merchantInvoiceNumber": transaction_id,
-        }
-
-        data = create_bkash_payment(token, payload)
-        if data is None:
-            payment.raw_response = {"error": "create request failed"}
-            payment.status = "failed"
-            payment.save()
-            return Response({"error": "bKash create payment failed"}, status=400)
-
-        #  Save gateway response
-        payment.raw_response = data
-        payment.save()
-
-        # Return redirect URL (sandbox flows usually provide bkashURL/paymentID)
-        return Response({
-            "paymentID": data.get("paymentID"),
-            "bkashURL": data.get("bkashURL"),
-            "transaction_id": transaction_id
-        })
-
-
-
-
-class PaymentSuccessView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        transaction_id = request.data.get("transaction_id")
-
-        payment = Payment.objects.get(transaction_id=transaction_id)
-
-        # ✔ payment success
-        payment.status = "success"
-        payment.save()
-
-        # ✔ order paid
-        order = payment.order
-        order.status = "paid"
-        order.save()
-
-        return Response({"message": "Payment successful"})
-
-
-
-
-
-
-
-
-
-class BkashPaymentExecuteView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        paymentID = request.data.get("paymentID")
-        token = get_bkash_token()
-        if not token:
-            return Response({"error": "bKash token failed"}, status=400)
-
-        payload = {"paymentID": paymentID}
-        data = execute_bkash_payment(token, payload)
-        if data is None:
-            return Response({"error": "bKash execute failed"}, status=400)
-
-        transaction_id = data.get("merchantInvoiceNumber") or data.get("merchantInvoiceNo") or data.get("merchantInvoice")
+        if order.status != 'pending':
+            return Response({"error": "Order is not pending"}, status=400)
 
         try:
-            payment = Payment.objects.get(transaction_id=transaction_id)
-        except Payment.DoesNotExist:
-            return Response({"error": "Payment not found"}, status=404)
-
-        # statusCode '0000' indicates success in many bKash APIs
-        if data.get("statusCode") == "0000" or data.get("status") == "success":
-            payment.status = "success"
-            payment.raw_response = data
-            payment.save()
-
-            order = payment.order
-            order.status = "paid"
-            order.save()
-
-            return Response({"message": "bKash payment successful"})
-
-        payment.status = "failed"
-        payment.raw_response = data
-        payment.save()
-
-        return Response({"message": "Payment failed"}, status=400)
+            success_url = request.build_absolute_uri('/success/')
+            cancel_url = request.build_absolute_uri('/cancel/')
+            checkout_session = create_stripe_checkout_session(order, success_url, cancel_url)
+            return Response({'session_url': checkout_session.url, 'session_id': checkout_session.id})
+        except Exception as e:
+            return Response({'msg': 'Something went wrong while creating stripe session', 'error': str(e)}, status=500)
 
 
 
-from rest_framework.decorators import api_view
-
-@api_view(["GET", "POST"])
-def bkash_callback(request):
-    # bKash may call this endpoint with POST data or query params
-    data = request.data if request.method == "POST" else request.GET
-
-    # try to find merchantInvoiceNumber or similar field
-    transaction_id = data.get("merchantInvoiceNumber") or data.get("merchantInvoiceNo") or data.get("merchantInvoice") or data.get("merchantInvoiceNumber")
-
-    if not transaction_id:
-        return Response({"error": "merchant invoice not provided"}, status=400)
-
-    try:
-        payment = Payment.objects.get(transaction_id=transaction_id)
-    except Payment.DoesNotExist:
-        return Response({"error": "Payment not found"}, status=404)
-
-    # Try to determine success from status code or provided status
-    status_code = data.get("statusCode") or data.get("status")
-    payment.raw_response = data
-    if status_code == "0000" or str(status_code).lower() == "success":
-        payment.status = "success"
-        payment.save()
-        order = payment.order
-        order.status = "paid"
-        order.save()
-        return Response({"message": "Payment marked as success"})
-
-    payment.status = "failed"
-    payment.save()
-    return Response({"message": "Payment updated"})
 
 
-# Stripe Payment Views
-class StripePaymentInitView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        print("StripePaymentInitView called")  # Debug
-        order_id = request.data.get("order_id")
-        print(f"order_id: {order_id}")  # Debug
-
-        try:
-            order = Order.objects.get(id=order_id, user=request.user)
-        except Order.DoesNotExist:
-            return Response({"error": "Order not found"}, status=404)
-
-        if order.total_amount <= 0:
-            return Response({"error": "Order total amount must be greater than 0"}, status=400)
-
-        print(f"Order total: {order.total_amount}, type: {type(order.total_amount)}")  # Debug
-        transaction_id = str(uuid.uuid4())
-        payment = Payment.objects.create(
-            order=order,
-            provider="stripe",
-            transaction_id=transaction_id,
-            status="pending",
-            raw_response={}
-        )
-
-        # Create Stripe PaymentIntent
-        try:
-            intent = create_stripe_payment_intent(
-                amount=order.total_amount,
-                currency="bdt",  # Using BDT for Bangladesh
-                metadata={"order_id": str(order.id), "transaction_id": transaction_id}
-            )
-            print(f"Stripe intent created: {intent.id if intent else 'None'}")  # Debug
-        except Exception as exc:
-            print(f"Stripe error: {exc}")  # Debug
-            payment.status = "failed"
-            payment.raw_response = {"error": str(exc)}
-            payment.save()
-            return Response({"error": "Stripe payment init failed", "details": str(exc)}, status=400)
-
-        if not intent:
-            payment.status = "failed"
-            payment.raw_response = {"error": "Stripe PaymentIntent creation failed"}
-            payment.save()
-            return Response({"error": "Stripe payment init failed"}, status=400)
-
-        payment.raw_response = {
-            "payment_intent_id": intent.id,
-            "client_secret": intent.client_secret,
-            "amount": intent.amount,
-            "currency": intent.currency,
-        }
-        payment.save()
-
-        return Response({
-            "payment_intent_id": intent.id,
-            "client_secret": intent.client_secret,
-            "transaction_id": transaction_id
-        })
-
-class StripePaymentConfirmView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        print("StripePaymentConfirmView called")  # Debug
-        payment_intent_id = request.data.get("payment_intent_id")
-        payment_method_id = request.data.get("payment_method_id")  # For backend confirmation
-        print(f"payment_intent_id: {payment_intent_id}, payment_method_id: {payment_method_id}")  # Debug
-
-        if not payment_intent_id:
-            return Response({"error": "payment_intent_id required"}, status=400)
-
-        # Retrieve and confirm the PaymentIntent
-        if payment_method_id:
-            # Update the PaymentIntent with payment method
-            stripe.PaymentIntent.modify(
-                payment_intent_id,
-                payment_method=payment_method_id,
-            )
-        
-        intent = confirm_stripe_payment_intent(
-            payment_intent_id, 
-            return_url="http://127.0.0.1:8000/payment/success/"
-        )
-
-        if not intent:
-            return Response({"error": "Stripe confirm failed"}, status=400)
-
-        # Find payment by transaction_id from metadata
-        transaction_id = intent.metadata.get("transaction_id")
-        if not transaction_id:
-            return Response({"error": "Transaction ID not found in metadata"}, status=400)
-
-        try:
-            payment = Payment.objects.get(transaction_id=transaction_id)
-        except Payment.DoesNotExist:
-            return Response({"error": "Payment not found"}, status=404)
-
-        if intent.status == "succeeded":
-            payment.status = "success"
-            payment.raw_response = {
-                "payment_intent_id": intent.id,
-                "status": intent.status,
-                "amount_received": intent.amount_received,
-            }
-            payment.save()
-
-            order = payment.order
-            order.status = "paid"
-            order.save()
-
-            return Response({"message": "Stripe payment successful"})
-
-        payment.status = "failed"
-        payment.raw_response = {
-            "payment_intent_id": intent.id,
-            "status": intent.status,
-            "last_payment_error": getattr(intent.last_payment_error, 'message', None) if intent.last_payment_error else None,
-        }
-        payment.save()
-
-        return Response({"message": "Payment failed"}, status=400)
-    
-
-import json
-from django.http import HttpResponse
-from django.views.decorators.csrf import csrf_exempt
 
 @csrf_exempt
-@api_view(["POST"])
 def stripe_webhook(request):
+    print("Stripe webhook called")
     payload = request.body
     sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    event = None
 
     try:
         event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+            payload, sig_header, settings.STRIPE_SECRET_WEBHOOK
         )
     except ValueError as e:
+        # Invalid payload
+        print(f"Invalid payload: {e}")
+        logger.error(f"Invalid payload: {e}")
         return HttpResponse(status=400)
     except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        print(f"Invalid signature: {e}")
+        logger.error(f"Invalid signature: {e}")
         return HttpResponse(status=400)
 
-    # Handle the event
-    if event['type'] == 'payment_intent.succeeded':
-        payment_intent = event['data']['object']
-        transaction_id = payment_intent['metadata'].get('transaction_id')
-        if transaction_id:
-            try:
-                payment = Payment.objects.get(transaction_id=transaction_id)
-                payment.status = "success"
-                payment.raw_response = payment_intent
-                payment.save()
-                order = payment.order
-                order.status = "paid"
-                order.save()
-            except Payment.DoesNotExist:
-                pass  # Log or handle
+    print(f"Received event: {event['type']}")
+    logger.info(f"Received event: {event['type']}")
 
-    elif event['type'] == 'payment_intent.payment_failed':
-        payment_intent = event['data']['object']
-        transaction_id = payment_intent['metadata'].get('transaction_id')
-        if transaction_id:
-            try:
-                payment = Payment.objects.get(transaction_id=transaction_id)
-                payment.status = "failed"
-                payment.raw_response = payment_intent
-                payment.save()
-            except Payment.DoesNotExist:
-                pass
+    # Handle the event
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        print(f"Processing payment for session: {session['id']}")
+        logger.info(f"Processing payment for session: {session['id']}")
+        handle_successful_payment(session)
+        print("**************",session)
 
     return HttpResponse(status=200)
+
+
+def handle_successful_payment(session):
+    print(f"Handling payment for session: {session['id']}")
+    order_id = int(session['metadata']['order_id'])
+    print(f"Order ID from metadata: {order_id}")
+    logger.info(f"Handling payment for order_id: {order_id}")
+    try:
+        with transaction.atomic():
+            order = Order.objects.select_for_update().get(id=order_id)
+            print(f"Order found: {order.id}, current status: {order.status}")
+            logger.info(f"Order found: {order.id}, current status: {order.status}")
+            if order.status == 'pending':
+                order.status = 'paid'
+                order.save()
+                print(f"Order {order.id} status updated to paid")
+                logger.info(f"Order {order.id} status updated to paid")
+
+                # Reduce stock
+                for item in order.items.all():
+                    print(f"Reducing stock for product {item.product.name}: {item.quantity}")
+                    logger.info(f"Reducing stock for product {item.product.name}: {item.quantity}")
+                    item.product.reduce_stock(item.quantity)
+
+                # Create Payment record
+                Payment.objects.create(
+                    order=order,
+                    provider='stripe',
+                    transaction_id=session.get('payment_intent', session['id']),
+                    status='success',
+                    raw_response=session
+                )
+                print(f"Payment record created for order {order.id}")
+                logger.info(f"Payment record created for order {order.id}")
+            else:
+                print(f"Order {order.id} is not pending, status: {order.status}")
+                logger.warning(f"Order {order.id} is not pending, status: {order.status}")
+    except Order.DoesNotExist:
+        print(f"Order {order_id} does not exist")
+        logger.error(f"Order {order_id} does not exist")
+    except Exception as e:
+        print(f"Error handling payment: {e}")
+        logger.error(f"Error handling payment: {e}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

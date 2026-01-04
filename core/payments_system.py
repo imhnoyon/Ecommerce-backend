@@ -4,66 +4,6 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-
-def get_bkash_token():
-    """Request a bKash token and return it or None on failure."""
-    url = f"{settings.BKASH_BASE_URL}/tokenized/checkout/token/grant"
-
-    headers = {
-        "username": settings.BKASH_USERNAME,
-        "password": settings.BKASH_PASSWORD,
-        "Content-Type": "application/json",
-    }
-
-    payload = {
-        "app_key": settings.BKASH_APP_KEY,
-        "app_secret": settings.BKASH_APP_SECRET,
-    }
-
-    try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        # sandbox/production sometimes differ in naming
-        token = data.get("id_token") or data.get("idToken") or data.get("token")
-        return token
-    except Exception as exc:
-        logger.exception("Failed to get bKash token: %s", exc)
-        return None
-
-
-def create_bkash_payment(token, payload):
-    url = f"{settings.BKASH_BASE_URL}/tokenized/checkout/create"
-    headers = {
-        "Authorization": token,
-        "X-APP-Key": settings.BKASH_APP_KEY,
-        "Content-Type": "application/json",
-    }
-    try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=10)
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as exc:
-        logger.exception("bKash create payment failed: %s", exc)
-        return None
-
-
-def execute_bkash_payment(token, payload):
-    url = f"{settings.BKASH_BASE_URL}/tokenized/checkout/execute"
-    headers = {
-        "Authorization": token,
-        "X-APP-Key": settings.BKASH_APP_KEY,
-        "Content-Type": "application/json",
-    }
-    try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=10)
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as exc:
-        logger.exception("bKash execute payment failed: %s", exc)
-        return None
-
-
 # Stripe integration
 import stripe
 
@@ -91,10 +31,30 @@ def confirm_stripe_payment_intent(payment_intent_id, payment_method=None, return
     return intent
 
 
-def retrieve_stripe_payment_intent(payment_intent_id):
-    """Retrieve a Stripe PaymentIntent."""
-    intent = stripe.PaymentIntent.retrieve(payment_intent_id)
-    return intent
+def create_stripe_checkout_session(order, success_url, cancel_url):
+    """Create a Stripe Checkout Session for an order."""
+    line_items = []
+    for item in order.items.all():
+        line_items.append({
+            'price_data': {
+                'currency': 'bdt',
+                'product_data': {
+                    'name': item.product.name,
+                },
+                'unit_amount': int(item.price * 100),
+            },
+            'quantity': item.quantity,
+        })
+
+    session = stripe.checkout.Session.create(
+        payment_method_types=['card'],
+        line_items=line_items,
+        mode='payment',
+        metadata={"order_id": order.id, "user_id": order.user.id},
+        success_url=success_url,
+        cancel_url=cancel_url,
+    )
+    return session
 
 
 
