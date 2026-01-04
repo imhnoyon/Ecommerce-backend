@@ -1,94 +1,82 @@
-🛒 Modern E-commerce REST API Backend
+# 🚀 Robust E-commerce RESTful API
 
-A robust, scalable, and secure E-commerce Backend built with Django REST Framework (DRF). This project implements advanced features like JWT authentication, real-time inventory management with race-condition prevention, and multi-gateway payment integrations (bKash & Stripe).
+A high-performance, secure, and feature-rich E-commerce backend built with **Django REST Framework (DRF)**. This project is designed with a focus on data integrity, real-time inventory synchronization, and seamless multi-gateway payment integration.
 
-🚀 Key Features
-🔐 Security & Authentication
-JWT Authentication: Implements stateless user authentication using SimpleJWT for secure login and signup flows.
+---
 
-Environment Protection: Sensitive credentials (API Keys, Database URI) are managed securely using django-environ.
+## 💎 Key Highlights
 
-🛠️ Advanced Order Engineering
-Atomic Transactions: Ensures "All-or-Nothing" operations during order creation. If any part of the process fails, the database rolls back to maintain a clean state.
+### 🔐 Security & Authentication
+* **JWT Authentication:** Implements stateless user authentication using **SimpleJWT** for secure login and signup flows.
+* **Environment Protection:** Sensitive credentials (API Keys, Database URI) are managed securely using **django-environ**.
 
-Dynamic Calculations: total_amount is calculated dynamically using custom model methods and database aggregation, ensuring 100% accuracy between orders and items.
+### 🛠️ Advanced Order Engineering
+* **Atomic Transactions:** Ensures "All-or-Nothing" operations during order creation. If any part of the process fails, the database rolls back to maintain a clean state.
+* **Dynamic Calculations:** `total_amount` is calculated dynamically using custom model methods and database aggregation, ensuring 100% accuracy between orders and items.
 
-📦 Inventory & Concurrency Control
-Real-time Stock Management: Automatic stock reduction triggered instantly upon successful payment verification.
+### 📦 Inventory & Concurrency Control
+* **Real-time Stock Management:** Automatic stock reduction triggered instantly upon successful payment verification.
+* **Race-Condition Prevention:** Implements **Database-level Locking** (`select_for_update`) to prevent overselling, ensuring that stock levels remain accurate even under high concurrent traffic.
 
-Race-Condition Prevention: Implements Database-level Locking (select_for_update) to prevent overselling, ensuring that stock levels remain accurate even under high concurrent traffic.
+### 💳 Integrated Payment Ecosystem
+* **bKash (Tokenized API):** A full implementation including Token Granting, Payment Initiation, Execution, and Callback handling.
+* **Stripe (Secure Checkout):** Card processing with professional **Webhook support** to verify payment events independently of the client-side flow.
 
-💳 Integrated Payment Ecosystem
-bKash (Tokenized API): A full implementation including Token Granting, Payment Initiation, Execution, and Callback handling.
+---
 
-Stripe (Secure Checkout): Card processing with professional Webhook support to verify payment events independently of the client-side flow.
+## 🏗️ Core Database Architecture
 
-🏗️ Core Database Architecture
 The system utilizes four specialized tables designed for relational efficiency:
 
-User: Managed via Django's auth system with JWT integration.
-
-Product: Manages inventory, pricing, and item details.
-
-Order: Tracks purchase lifecycle, payment status, and final amounts.
-
-OrderItem: Stores snapshots of product price and quantity at the time of purchase.
-
-Payment: Logs transaction IDs, provider data, and raw responses for auditing.
+1. **User:** Managed via Django's auth system with JWT integration.
+2. **Product:** Manages inventory, pricing, and item details.
+3. **Order:** Tracks purchase lifecycle, payment status, and final amounts.
+4. **OrderItem:** Stores snapshots of product price and quantity at the time of purchase.
+5. **Payment:** Logs transaction IDs, provider data, and raw responses for auditing.
 
 
-🛠️ Tech Stack
-Framework: Django 4.2+, Django REST Framework (DRF)
 
-Database: PostgreSQL (Production), SQLite (Dev)
+---
 
-Auth: JSON Web Tokens (JWT)
+## 🚀 Installation & Setup
 
-Tools: Python-dotenv, Django-environ, Stripe-python
+### 1. Clone the Repository
+```bash
+git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
+cd your-repo-name
+```
 
-🧪 Testing bKash Sandbox
-Test Wallet: 01770618575
-
-OTP: 123456
-
-PIN: 12121
-
-
-📋 Installation & Setup
-Clone the Repository:
-
-Bash
-
-git clone https://github.com/yourusername/ecommerce-backend.git
-cd ecommerce-backend
-Create Virtual Environment:
-
-Bash
-
+### 2. Environment Setup
+```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-Install Dependencies:
-
-Bash
-
 pip install -r requirements.txt
-Environment Setup: Create a .env file in the root directory:
+```
 
-env
+### 3. Configuration (.env)
+```Code snippet
 
-SECRET_KEY=your_secret_key
 DEBUG=True
+SECRET_KEY=your_django_secret_key
+STRIPE_SECRET_KEY=your_stripe_key
 BKASH_APP_KEY=your_bkash_key
 BKASH_APP_SECRET=your_bkash_secret
-STRIPE_SECRET_KEY=your_stripe_key
-
-Database Migration:
-Bash
-
+BKASH_USERNAME=your_username
+BKASH_PASSWORD=your_password
+```
+### 4. Database Migration
+```bash
+python manage.py makemigrations
 python manage.py migrate
 python manage.py createsuperuser
-Run Server:
-
-Bash
-
 python manage.py runserver
+```
+
+## 📡 API Endpoints Overview
+| Method | Endpoint | Description | Auth |
+|:--- |:--- |:--- |:--- |
+| `POST` | `/api/auth/login/` | Obtain JWT Access/Refresh Tokens | No |
+| `GET` | `/api/products/` | List all available products | No |
+| `POST` | `/api/orders/` | Place a new order (Atomic Transaction) | Yes |
+| `POST` | `/api/payment/bkash/initiate/` | Start bKash Payment flow | Yes |
+| `POST` | `/api/payment/stripe/session/` | Create Stripe Checkout Session | Yes |
