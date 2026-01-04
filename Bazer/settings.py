@@ -12,10 +12,14 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import environ
-env = environ.Env()
-environ.Env.read_env()
+import os
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+env = environ.Env()
+# .env ফাইলটি লোড করা
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
 
 
 # Quick-start development settings - unsuitable for production
@@ -144,22 +148,24 @@ SIMPLE_JWT = {
 
 
 
+# BKASH_BASE_URL = "https://tokenized.sandbox.bka.sh/v1.2.0-beta"
 
-import os
+# BKASH_APP_KEY = "4f6o0cjiki2rfm34kfdadl1eqq"
+# BKASH_APP_SECRET ="2is7hdktrekvrbljjh44ll3d9l1dtjo4pasmjvs5vl5qr3fug4b"
+# BKASH_USERNAME ="sandboxTokenizedUser02"
+# BKASH_PASSWORD ="sandboxTokenizedUser02@12345"
 
-BKASH_BASE_URL = os.environ.get("BKASH_BASE_URL", "https://sandbox.sandbox.bka.sh/v1.2.0-beta")
-
-BKASH_APP_KEY = os.environ.get("BKASH_APP_KEY", "your_app_key")
-BKASH_APP_SECRET = os.environ.get("BKASH_APP_SECRET", "your_app_secret")
-BKASH_USERNAME = os.environ.get("BKASH_USERNAME", "your_username")
-BKASH_PASSWORD = os.environ.get("BKASH_PASSWORD", "your_password")
-
-# callback URL that bKash will call (set to your public URL in production)
-BKASH_CALLBACK_URL = os.environ.get("BKASH_CALLBACK_URL", "http://127.0.0.1:8000/api/payment/bkash/callback/")
+# # callback URL that bKash will call (set to your public URL in production)
+# BKASH_CALLBACK_URL = 'http://127.0.0.1:8000/api/payment/bkash/callback/'
 
 
 
-
+BKASH_BASE_URL = env('BKASH_BASE_URL')
+BKASH_APP_KEY = env('BKASH_APP_KEY')
+BKASH_APP_SECRET = env('BKASH_APP_SECRET')
+BKASH_USERNAME = env('BKASH_USERNAME')  
+BKASH_PASSWORD = env('BKASH_PASSWORD')
+BKASH_CALLBACK_URL = env('BKASH_CALLBACK_URL')
 
 STRIPE_PUBLIC_KEY="pk_test_51SlWJ93gtWGimJpJkoRAtV9dJJ7vIczAtUD3fqguy9j15da19cbC9jSyalsRHFjla6HXk6gKJrQSX3fIzCqmhDa500u4tCJ7mK"
 STRIPE_SECRET_KEY="sk_test_51SlWJ93gtWGimJpJ2Ww8AlELlDJKbQjOeTZ05gGw55g7W6iWEU7TvueNfCxBpZk1iPToCwl1uW1o7qM7YsR6GvJm00nMYkttx5"

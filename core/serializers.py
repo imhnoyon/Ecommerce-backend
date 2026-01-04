@@ -94,4 +94,5 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = "__all__"
-        read_only_fields = "__all__"
+        # পেমেন্ট মডেলের ফিল্ডগুলোর নাম এখানে দিন
+        read_only_fields = ["id", "order", "provider", "transaction_id", "status", "raw_response", "created_at"]
