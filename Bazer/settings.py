@@ -145,21 +145,6 @@ SIMPLE_JWT = {
 
 
 
-
-
-
-# BKASH_BASE_URL = "https://tokenized.sandbox.bka.sh/v1.2.0-beta"
-
-# BKASH_APP_KEY = "4f6o0cjiki2rfm34kfdadl1eqq"
-# BKASH_APP_SECRET ="2is7hdktrekvrbljjh44ll3d9l1dtjo4pasmjvs5vl5qr3fug4b"
-# BKASH_USERNAME ="sandboxTokenizedUser02"
-# BKASH_PASSWORD ="sandboxTokenizedUser02@12345"
-
-# # callback URL that bKash will call (set to your public URL in production)
-# BKASH_CALLBACK_URL = 'http://127.0.0.1:8000/api/payment/bkash/callback/'
-
-
-
 BKASH_BASE_URL = env('BKASH_BASE_URL')
 BKASH_APP_KEY = env('BKASH_APP_KEY')
 BKASH_APP_SECRET = env('BKASH_APP_SECRET')
