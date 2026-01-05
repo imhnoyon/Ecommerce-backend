@@ -9,7 +9,7 @@ from .permissions import IsAdminOrReadOnly
 import logging
 logger = logging.getLogger(__name__)
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse
+from django.http import HttpResponse,JsonResponse
 import json
 from django.db import transaction
 from rest_framework.pagination import PageNumberPagination
@@ -46,7 +46,7 @@ class productViewset(ModelViewSet):
 class OrderItemViewset(ModelViewSet):
     queryset=OrderItem.objects.all()
     serializer_class= OrderItemSerializer
-    permission_classes=[IsAdminOrReadOnly]
+    permission_classes=[IsAuthenticated]
     
     
     def get_queryset(self):
@@ -60,7 +60,7 @@ class OrderItemViewset(ModelViewSet):
 class OrderViewset(ModelViewSet):
     queryset=Order.objects.all()
     serializer_class=OrderSerializer
-    permission_classes=[IsAdminOrReadOnly]
+    permission_classes=[IsAuthenticated]
     
     
     def get_queryset(self):
@@ -102,6 +102,14 @@ class StripeCreateSessionView(APIView):
 
         if order.status != 'pending':
             return Response({"error": "Order is not pending"}, status=400)
+        
+        for item in order.items.all():
+            if item.product.stock < item.quantity:
+                return Response({
+                    "error": f"stock out: {item.product.name}",
+                    "available_stock": item.product.stock
+                }, status=400)
+        
 
         try:
             success_url = request.build_absolute_uri('/success/')
@@ -114,11 +122,8 @@ class StripeCreateSessionView(APIView):
 
 
 
-
-
 @csrf_exempt
 def stripe_webhook(request):
-    print("Stripe webhook called")
     payload = request.body
     sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
     event = None
@@ -127,63 +132,41 @@ def stripe_webhook(request):
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.STRIPE_SECRET_WEBHOOK
         )
-    except ValueError as e:
-        # Invalid payload
-        print(f"Invalid payload: {e}")
-        logger.error(f"Invalid payload: {e}")
-        return HttpResponse(status=400)
-    except stripe.error.SignatureVerificationError as e:
-        # Invalid signature
-        print(f"Invalid signature: {e}")
-        logger.error(f"Invalid signature: {e}")
+    except Exception as e:
+        logger.error(f"Webhook signature error: {e}")
         return HttpResponse(status=400)
 
-    print(f"Received event: {event['type']}")
-    logger.info(f"Received event: {event['type']}")
-
-    # Handle the event
+    
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']
-        print(f"Processing payment for session: {session['id']}")
-        logger.info(f"Processing payment for session: {session['id']}")
-        handle_successful_payment(session)
         
+        success = handle_successful_payment(session)
+        if not success:
+            return HttpResponse(status=500)
 
     return HttpResponse(status=200)
 
-
 def handle_successful_payment(session):
-    print(f"Handling payment for session: {session['id']}")
-    order_id = int(session['metadata']['order_id'])
-    print(f"Order ID from metadata: {order_id}")
-    logger.info(f"Handling payment for order_id: {order_id}")
     try:
+        order_id = session['metadata'].get('order_id')
+        if not order_id:
+            return False
+
         with transaction.atomic():
+            
             order = Order.objects.select_for_update().get(id=order_id)
-            print(f"Order found: {order.id}, current status: {order.status}")
-            logger.info(f"Order found: {order.id}, current status: {order.status}")
+            
             if order.status == 'pending':
-                product_ids = order.items.values_list('product_id', flat=True)
-                products = Product.objects.select_for_update().filter(id__in=product_ids)
-                product_dict = {p.id: p for p in products}
                 
-                
-                # Reduce stock
                 for item in order.items.all():
                     if item.product.stock < item.quantity:
-                        return HttpResponse(f"Insufficient stock for {item.product.name}", status=400)
-
-                for item in order.items.all():
-                    item.product.reduce_stock(item.quantity) 
-                    
+                        logger.error(f"Stock insufficient for {item.product.name}")
+                        return False 
+                    item.product.reduce_stock(item.quantity)
                 order.update_total()
                 order.status = 'paid'
                 order.save()
-                print(f"Order {order.id} status updated to paid")
-                logger.info(f"Order {order.id} status updated to paid")
-   
 
-                # Create Payment record
                 Payment.objects.create(
                     order=order,
                     provider='stripe',
@@ -191,19 +174,14 @@ def handle_successful_payment(session):
                     status='success',
                     raw_response=session
                 )
-                print(f"Payment record created for order {order.id}")
-                logger.info(f"Payment record created for order {order.id}")
-                return HttpResponse(f"<h1>Payment Successful!</h1><p>Transaction ID: {order.id}</p>")
-                
+                return True
             else:
-                print(f"Order {order.id} is not pending, status: {order.status}")
-                logger.warning(f"Order {order.id} is not pending, status: {order.status}")
-    except Order.DoesNotExist:
-        print(f"Order {order_id} does not exist")
-        logger.error(f"Order {order_id} does not exist")
+                logger.warning(f"Order {order.id} already processed.")
+                return True 
     except Exception as e:
-        print(f"Error handling payment: {e}")
-        logger.error(f"Error handling payment: {e}")
+        logger.error(f"Error handling payment: {str(e)}")
+        return False
+
 
 
 
@@ -232,7 +210,14 @@ class BkashPaymentInitView(APIView):
         if order.status != 'pending':
             return Response({"error": "Order is not pending"}, status=400)
             
-         
+        for item in order.items.all():
+            if item.product.stock < item.quantity:
+                return Response({
+                    "error": f"Insufficient stock for {item.product.name}",
+                    "product_id": item.product.id,
+                    "available_stock": item.product.stock
+                }, status=400)
+                
         subtotal = sum(item.subtotal() for item in order.items.all())   
         payment_data = create_bkash_payment(subtotal, order.id, payer_reference)
         if payment_data:
@@ -281,13 +266,8 @@ def bkash_callback(request):
                         
                         for item in order.items.all():
                             if item.product.stock < item.quantity:
-                                return HttpResponse(
-                                    f"<h1>Payment Failed!</h1><p>Insufficient stock for {item.product.name}. "
-                                    f"Available: {item.product.stock}, Requested: {item.quantity}</p>", 
-                                    status=400
-                                )
+                                Response({"error": "Insufficient stock"}, status=500)
 
-                        
                         for item in order.items.all():
                             product = item.product 
                             product.reduce_stock(item.quantity)
@@ -305,7 +285,7 @@ def bkash_callback(request):
                             raw_response=execute_data
                         )
                         
-                        return HttpResponse(f"<h1>Payment Successful!</h1><p>Transaction ID: {trx_id}</p>")
+                        return HttpResponse(f"Payment successful and order processed and transaction_id-->{trx_id}.")
                     else:
                         return HttpResponse("Order already processed.")
             
@@ -319,9 +299,8 @@ def bkash_callback(request):
             return HttpResponse(f"Payment execution failed: {error_msg}", status=400)
 
     elif status == 'cancel':
-        return HttpResponse("<h1>Payment Cancelled!</h1><p>You have cancelled the payment.</p>")
-    
-    return HttpResponse("<h1>Payment Failed!</h1>", status=400)
+        return JsonResponse({ "status": status,"message": f"Payment {status}" }, status=400)
+    return JsonResponse({ "status": status,"message": f"Payment Payment Failed!" }, status=400)
 
 
 
