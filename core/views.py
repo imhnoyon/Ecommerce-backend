@@ -62,7 +62,9 @@ class OrderViewset(ModelViewSet):
     serializer_class=OrderSerializer
     permission_classes=[IsAuthenticated]
     
-    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+        
     def get_queryset(self):
         user = self.request.user
         if user.is_staff or user.is_superuser:
@@ -90,6 +92,9 @@ class PaymentViewSet(ModelViewSet):
 
 
 
+#**************************************************************payment Views**************************************************************************
+
+#Stripe Payment Views
 class StripeCreateSessionView(APIView):
     permission_classes = [IsAuthenticated]
 

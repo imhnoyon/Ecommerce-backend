@@ -39,8 +39,6 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 
 
-
-
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True)
     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
@@ -52,11 +50,22 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         items_data = validated_data.pop("items")
-        user = self.context["request"].user
+        
+        
+        user = validated_data.pop('user', self.context["request"].user)
         
         with transaction.atomic():
+            for item in items_data:
+                product = item["product"]
+                if product.stock < item["quantity"]:
+                    raise serializers.ValidationError(
+                        f"Sorry, {product.name} Stock not available -> Stock available {product.stock}"
+                    )
+
+            
             order = Order.objects.create(user=user, **validated_data)
 
+          
             for item in items_data:
                 OrderItem.objects.create(
                     order=order, 
@@ -66,23 +75,24 @@ class OrderSerializer(serializers.ModelSerializer):
                 )
             
             order.refresh_from_db() 
-            print(f"BEFORE UPDATE: {order.total_amount}")
             order.update_total()
-            print(f"AFTER UPDATE: {order.total_amount}")
-            
             return order
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop("items", None)
 
         with transaction.atomic():
-            
             for attr, value in validated_data.items():
                 setattr(instance, attr, value)
             instance.save()
 
             if items_data is not None:
-                
+                for item in items_data:
+                    product = item["product"]
+                    if product.stock < item["quantity"]:
+                        raise serializers.ValidationError(
+                            f"Update failed! There is insufficient stock for {product.name}."
+                        )
                 instance.items.all().delete()
                 for item in items_data:
                     OrderItem.objects.create(
@@ -91,9 +101,9 @@ class OrderSerializer(serializers.ModelSerializer):
                         quantity=item["quantity"], 
                         price=item["price"]
                     )
+            
             instance.refresh_from_db()
             instance.update_total()
-            
             return instance
 
 
