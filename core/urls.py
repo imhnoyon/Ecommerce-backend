@@ -13,15 +13,17 @@ router.register('register',RegisterUserView,basename='Register')
 router.register('payment',PaymentViewSet,basename='payment')
 
 urlpatterns =[
-    path("",include(router.urls)),
+    
     path("login/",TokenObtainPairView.as_view(),name='login'),
     path("checkout/order/<id>/",StripeCreateSessionView.as_view(),name="checkout-session"),
     path("payment/stripe/webhook/", stripe_webhook),
-    
-    
     path("payment/bkash/init/<int:order_id>/", BkashPaymentInitView.as_view()),
     path("payment/bkash/execute/", BkashPaymentExecuteView.as_view()),
     path("payment/bkash/callback/", bkash_callback),
+    
+    
+    path("",include(router.urls)),
+    
     
     
 ]
