@@ -19,6 +19,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.conf import settings
 from rest_framework import status
+from django.utils.decorators import method_decorator
+
 
 
 
@@ -95,6 +97,7 @@ class PaymentViewSet(ModelViewSet):
 #**************************************************************payment Views**************************************************************************
 
 #Stripe Payment Views
+@method_decorator(csrf_exempt, name='dispatch')
 class StripeCreateSessionView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -192,6 +195,7 @@ def handle_successful_payment(session):
 
 
 # bKash Payment Views
+@method_decorator(csrf_exempt, name='dispatch')
 class BkashPaymentInitView(APIView):
     permission_classes = [IsAuthenticated]
 
