@@ -89,16 +89,12 @@ WSGI_APPLICATION = 'Bazer.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'BAZER',
-        'USER': 'root',
-        'PASSWORD': '12345', 
-        'HOST': '127.0.0.1',                
-        'PORT': '3306',                     
-        'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-            'charset': 'utf8mb4',
-        },
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': env('DB_NAME'),
+        'USER': env('DB_USER'),
+        'PASSWORD': env('DB_PASSWORD'),
+        'HOST': env('DB_HOST'),
+        'PORT': env('DB_PORT'),
     }
 }
 
@@ -174,4 +170,6 @@ STRIPE_SECRET_KEY="sk_test_51SlWJ93gtWGimJpJ2Ww8AlELlDJKbQjOeTZ05gGw55g7W6iWEU7T
 STRIPE_SECRET_WEBHOOK="whsec_bbc2e4efd5228f30494342b4de6e73d4cc15e8d20c9ad67589e280d59e25b3f3"
 
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+
+
