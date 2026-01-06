@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 import environ
 import os
-
+import dj_database_url
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
@@ -87,17 +87,23 @@ WSGI_APPLICATION = 'Bazer.wsgi.application'
 # }
 
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env('DB_NAME'),
-        'USER': env('DB_USER'),
-        'PASSWORD': env('DB_PASSWORD'),
-        'HOST': env('DB_HOST'),
-        'PORT': env('DB_PORT'),
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': env('DB_NAME'),
+#         'USER': env('DB_USER'),
+#         'PASSWORD': env('DB_PASSWORD'),
+#         'HOST': env('DB_HOST'),
+#         'PORT': env('DB_PORT'),
+#     }
+# }
 
+DATABASES = {
+    'default': dj_database_url.config(
+        default='postgresql://bazerdb_user:SlbrD5BSZFUqVozPvt2jUWRDMPnpGa6Z@dpg-d5ef4lvgi27c73avgi7g-a.virginia-postgres.render.com/bazerdb',
+        conn_max_age=600
+    )
+}
 
 
 
