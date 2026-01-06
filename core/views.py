@@ -13,7 +13,7 @@ from django.http import HttpResponse,JsonResponse
 import json
 from django.db import transaction
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 import uuid
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -31,7 +31,7 @@ class productPagination(PageNumberPagination):
 class RegisterUserView(ModelViewSet):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
-    
+    permission_classes = [AllowAny]
     
 
 
