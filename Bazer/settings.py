@@ -90,11 +90,11 @@ WSGI_APPLICATION = 'Bazer.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME':env('DB_NAME'),
-        'USER': env('DB_USER'),
-        'PASSWORD': env('DB_PASSWORD'),
-        'HOST': env('DB_HOST'),
-        'PORT': env('DB_PORT'),
+        'NAME': 'BAZER',
+        'USER': 'root',
+        'PASSWORD': '12345', 
+        'HOST': '127.0.0.1',                
+        'PORT': '3306',                     
         'OPTIONS': {
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
             'charset': 'utf8mb4',
