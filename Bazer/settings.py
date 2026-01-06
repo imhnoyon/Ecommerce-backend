@@ -50,7 +50,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    # 'django.middleware.csrf.CsrfViewMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -147,9 +147,12 @@ AUTH_USER_MODEL = 'core.User'
 
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
+    'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ]
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
 }
 
 from datetime import timedelta
@@ -161,7 +164,9 @@ SIMPLE_JWT = {
 }
 
 
-
+CSRF_TRUSTED_ORIGINS = [
+    'https://ebazer.onrender.com', 
+]
 
 
 BKASH_BASE_URL = env('BKASH_BASE_URL')
@@ -179,3 +184,5 @@ STRIPE_SECRET_WEBHOOK="whsec_bbc2e4efd5228f30494342b4de6e73d4cc15e8d20c9ad67589e
 
 
 
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
